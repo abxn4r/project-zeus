@@ -1,0 +1,31 @@
+{
+  "telegram": {
+    "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
+    "chatId": "YOUR_TELEGRAM_CHAT_ID"
+  },
+  "spotify": {
+    "clientId": "YOUR_SPOTIFY_CLIENT_ID",
+    "clientSecret": "YOUR_SPOTIFY_CLIENT_SECRET",
+    "userIds": [
+      "SPOTIFY_USER_ID_1"
+    ],
+    "playlists": [
+      "PLAYLIST_ID_1"
+    ]
+  },
+  "pinterest": {
+    "usernames": [
+      "PINTEREST_USERNAME_1"
+    ]
+  },
+  "instagram": {
+    "usernames": [
+      "INSTAGRAM_USERNAME_1"
+    ]
+  },
+  "intervals": {
+    "spotify_seconds": 60,
+    "pinterest_seconds": 300,
+    "instagram_seconds": 900
+  }
+}

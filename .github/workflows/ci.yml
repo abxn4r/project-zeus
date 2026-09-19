@@ -1,0 +1,79 @@
+name: Project Zeus CI & Syntax Validation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  shellcheck:
+    name: POSIX Shell & Syntax Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Shell Syntax Check (sh -n)
+        run: |
+          echo "Validating POSIX syntax for all shell scripts..."
+          find . -name "*.sh" -exec sh -n {} \;
+          sh -n bin/zeus
+          echo "All shell scripts passed syntax check successfully!"
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: warning
+          ignore_paths: >-
+            apps/zeus-monitor/node_modules
+            apps/zeus-dashboard/node_modules
+
+  json-lint:
+    name: JSON Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Validate JSON Files
+        run: |
+          python3 -c "
+          import json, glob, sys
+          for f in glob.glob('**/*.json', recursive=True) + glob.glob('**/*.template', recursive=True):
+              if 'node_modules' in f: continue
+              try:
+                  with open(f) as fp: json.load(fp)
+                  print(f'[OK] {f}')
+              except Exception as e:
+                  print(f'[FAIL] {f}: {e}')
+                  sys.exit(1)
+          "
+  code-lint:
+    name: Node.js & Python Syntax Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Validate JavaScript Syntax (node -c)
+        run: |
+          echo "Validating JavaScript syntax..."
+          find . -name "*.js" -not -path "*/node_modules/*" -exec node -c {} +
+          echo "All JavaScript files passed syntax check!"
+
+      - name: Validate Python Syntax (py_compile)
+        run: |
+          echo "Validating Python syntax..."
+          python3 -m compileall -q bin/ apps/zeus-monitor/lib/
+          echo "All Python files compiled successfully!"

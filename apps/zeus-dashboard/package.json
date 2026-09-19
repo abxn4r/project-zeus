@@ -1,0 +1,12 @@
+{
+  "name": "zeus-dashboard",
+  "version": "1.0.0",
+  "description": "Tactical Phosphor Green Matrix CRT Terminal & Command Dashboard for Project Zeus",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["zeus", "matrix", "dashboard", "android", "server", "crt"],
+  "author": "Lead Infrastructure Engineering",
+  "license": "MIT"
+}

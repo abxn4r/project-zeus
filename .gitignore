@@ -1,0 +1,76 @@
+# ==============================================================================
+# Project Zeus - Git Ignore Rules
+# ==============================================================================
+
+# OS & Editor artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Sensitive Configuration & Credentials (NEVER COMMIT)
+config.json
+*.env
+.env.*
+!*.example
+!config.json.template
+*.key
+*.pem
+*.pfx
+*.cert
+*.crt
+id_rsa*
+id_ed25519*
+authorized_keys
+known_hosts
+
+# Runtime, Volatile & Temporary Server Files
+logs/
+*.log
+runtime/
+*.pid
+*.sock
+tmp/
+cache/
+backups/*.tar.gz
+reports/*.html
+reports/*.txt
+reports/*.json
+state/svc_*
+state/boot_count
+state/last_boot
+state/network.state
+state/services.state
+
+# Heavy Precompiled Architecture Binaries (>25MB)
+# (Use scripts/setup-tailscale.sh to fetch official Tailscale ARM64 binaries)
+bin/tailscale
+bin/tailscaled
+
+# Node.js & Python dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+wheels/
+*.whl
+
+# Scanners & Third-Party Binaries
+apps/zap/
+bin/nuclei
+nuclei-templates/

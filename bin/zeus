@@ -1,0 +1,309 @@
+#!/system/bin/sh
+# ==============================================================================
+# Project Zeus - Unified Server Management CLI Binary
+# File: /data/local/server/bin/zeus
+# Purpose: Master administrative interface for Project Zeus
+# Usage:   zeus [status|logs|restart|reboot|metrics|backup|doctor|update|tailscale|runtimes]
+# ==============================================================================
+
+export SERVER_ROOT="${SERVER_ROOT:-/data/local/server}"
+export PATH="${SERVER_ROOT}/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin:$PATH"
+
+log_hdr() { printf "\033[1;34m=== %s ===\033[0m\n" "$*"; }
+log_ok()  { printf "\033[1;32m[✓]\033[0m %s\n" "$*"; }
+log_warn(){ printf "\033[1;33m[!]\033[0m %s\n" "$*"; }
+log_err() { printf "\033[1;31m[✗]\033[0m %s\n" "$*"; }
+
+show_help() {
+    cat << EOF
+Project Zeus Server Management Interface (zeus)
+
+Usage: zeus <command> [options]
+
+Commands:
+  status          Display overall system health, networking, runtimes, & service statuses
+  logs [name]     View system logs (boot|watchdog|metrics|services|main|dashboard)
+  metrics         Display real-time CPU thermal, memory, and hardware telemetry
+  restart <name>  Restart a specific registered service (e.g. sshd, adbd, tailscale, zap, dashboard)
+  scan <url>      Run vulnerability scan on target URL (nuclei|zap-baseline|zap-active)
+  scanner [op]    Manage scanner suite (status|setup|reports)
+  tailscale [op]  Manage Tailscale P2P mesh VPN (status|up|down|setup)
+  runtimes        Install/update Node.js (LTS), Python 3, Git, and build tools
+  doctor          Run system diagnostic checks and environment audit
+  backup          Create a compressed system configuration archive
+  update          Apply local repository script updates
+  reboot          Perform a clean system reboot
+EOF
+}
+
+cmd_status() {
+    log_hdr "PROJECT ZEUS SERVER STATUS"
+    
+    IP=$(cat "${SERVER_ROOT}/runtime/current_ip" 2>/dev/null || echo "N/A")
+    BOOT_COUNT=$(cat "${SERVER_ROOT}/state/boot_count" 2>/dev/null || echo "N/A")
+    LAST_BOOT=$(cat "${SERVER_ROOT}/state/last_boot" 2>/dev/null || echo "N/A")
+    UPTIME=$(uptime 2>/dev/null || echo "N/A")
+    DEVICE_MODEL=$(getprop ro.product.model 2>/dev/null || echo "ARM64 Android Host")
+    SOC_PLATFORM=$(getprop ro.board.platform 2>/dev/null || echo "ARM64")
+    
+    echo "  Host Device: ${DEVICE_MODEL} (${SOC_PLATFORM})"
+    echo "  IP Address:  ${IP} (wlan0)"
+    echo "  Total Boots: ${BOOT_COUNT} (Last: ${LAST_BOOT})"
+    echo "  Uptime:      ${UPTIME}"
+    echo ""
+    
+    log_hdr "SERVICE HEALTH & PORTS"
+    if pgrep -f sshd >/dev/null 2>&1 || pgrep dropbear >/dev/null 2>&1; then
+        log_ok "SSH / SFTP:  RUNNING (Port 8022/2222)"
+    else
+        log_err "SSH / SFTP:  DOWN"
+    fi
+    
+    if pgrep -f "tcpsvd.*2121" >/dev/null 2>&1 || pgrep -f "photo_ftp_server.py" >/dev/null 2>&1; then
+        log_ok "PhotoSync FTP: RUNNING (Port 2121)"
+    else
+        log_warn "PhotoSync FTP: STOPPED"
+    fi
+    
+    ADB_PORT=$(getprop service.adb.tcp.port 2>/dev/null || echo "")
+    if [ "$ADB_PORT" = "5555" ]; then
+        log_ok "Wireless ADB: ENABLED (TCP Port 5555)"
+    else
+        log_err "Wireless ADB: DISABLED"
+    fi
+    
+    if pgrep -f tailscaled >/dev/null 2>&1; then
+        log_ok "Tailscale:   RUNNING (Mesh VPN Daemon Active)"
+    else
+        log_warn "Tailscale:   STOPPED"
+    fi
+    
+    WATCHDOG_PID=$(cat "${SERVER_ROOT}/runtime/watchdog.pid" 2>/dev/null || echo "")
+    if [ -n "$WATCHDOG_PID" ] && kill -0 "$WATCHDOG_PID" 2>/dev/null; then
+        log_ok "Supervisor:  ACTIVE (PID ${WATCHDOG_PID})"
+    else
+        log_err "Supervisor:  STOPPED"
+    fi
+    
+    if pgrep -f "node server.js" >/dev/null 2>&1; then
+        log_ok "Dashboard:   ACTIVE (HTTP Port 8080)"
+    else
+        log_warn "Dashboard:   STOPPED"
+    fi
+    
+    echo ""
+    log_hdr "DEVELOPMENT RUNTIMES"
+    NODE_V=$(node -v 2>/dev/null || echo "NOT_INSTALLED")
+    PY_V=$(python3 --version 2>/dev/null || echo "NOT_INSTALLED")
+    GIT_V=$(git --version 2>/dev/null || echo "NOT_INSTALLED")
+    
+    [ "$NODE_V" != "NOT_INSTALLED" ] && log_ok "Node.js:     ${NODE_V}" || log_warn "Node.js:     NOT INSTALLED (Run 'zeus runtimes')"
+    [ "$PY_V" != "NOT_INSTALLED" ]   && log_ok "Python 3:    ${PY_V}"   || log_warn "Python 3:    NOT INSTALLED (Run 'zeus runtimes')"
+    [ "$GIT_V" != "NOT_INSTALLED" ]  && log_ok "Git:         ${GIT_V}"  || log_warn "Git:         NOT INSTALLED"
+}
+
+cmd_tailscale() {
+    OP="${1:-status}"
+    SOCKET="${SERVER_ROOT}/runtime/tailscaled.sock"
+    if [ "$OP" = "setup" ] || [ "$OP" = "install" ]; then
+        if [ -f "${SERVER_ROOT}/scripts/setup-tailscale.sh" ]; then
+            sh "${SERVER_ROOT}/scripts/setup-tailscale.sh"
+        else
+            log_err "Setup script missing: ${SERVER_ROOT}/scripts/setup-tailscale.sh"
+        fi
+        return
+    fi
+
+    if [ -x "${SERVER_ROOT}/bin/tailscale" ]; then
+        "${SERVER_ROOT}/bin/tailscale" --socket="$SOCKET" "$OP" ${2} ${3} ${4}
+    else
+        log_err "Tailscale binary missing at ${SERVER_ROOT}/bin/tailscale"
+        log_warn "To install, run: zeus tailscale setup"
+    fi
+}
+
+cmd_metrics() {
+    log_hdr "REAL-TIME TELEMETRY SNAPSHOT"
+    
+    max_temp=0
+    for tz in /sys/class/thermal/thermal_zone*; do
+        if [ -f "$tz/type" ] && [ -f "$tz/temp" ]; then
+            type_val=$(cat "$tz/type" 2>/dev/null)
+            case "$type_val" in
+                cpu-*-usr|cpu-0-*-usr|cpu-1-*-usr)
+                    temp_val=$(cat "$tz/temp" 2>/dev/null || echo 0)
+                    if [ "$temp_val" -gt "$max_temp" ] 2>/dev/null; then
+                        max_temp=$temp_val
+                    fi
+                    ;;
+            esac
+        fi
+    done
+    if [ "$max_temp" -eq 0 ]; then
+        max_temp=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0)
+    fi
+    CPU_TEMP=$((max_temp / 1000))
+    
+    BATT_RAW=$(cat /sys/class/power_supply/battery/temp 2>/dev/null || echo 0)
+    BATT_TEMP=$((BATT_RAW / 10))
+    
+    BATT_CAP=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo "N/A")
+    BATT_STAT=$(cat /sys/class/power_supply/battery/status 2>/dev/null || echo "N/A")
+    
+    CPU0_FREQ=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null || echo 0)
+    CPU0_GOV=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "N/A")
+    
+    FREE_M=$(free -m 2>/dev/null || echo "")
+    DATA_DF=$(df -h /data 2>/dev/null | awk 'NR==2 {print $3" / "$2" ("$5" used)"}' || echo "N/A")
+    
+    echo "  CPU Temp:     ${CPU_TEMP}°C"
+    echo "  Battery Temp: ${BATT_TEMP}°C"
+    echo "  Battery Level:${BATT_CAP}% (${BATT_STAT})"
+    echo "  CPU Scaling:  $((CPU0_FREQ / 1000)) MHz | Governor: ${CPU0_GOV}"
+    echo "  Data Disk:    ${DATA_DF}"
+    echo ""
+    log_hdr "MEMORY BREAKDOWN"
+    echo "$FREE_M"
+}
+
+cmd_logs() {
+    LOG_NAME="${1:-boot}"
+    case "$LOG_NAME" in
+        boot)      FILE="${SERVER_ROOT}/logs/boot.log" ;;
+        watchdog)  FILE="${SERVER_ROOT}/logs/watchdog.log" ;;
+        metrics)   FILE="${SERVER_ROOT}/logs/metrics.log" ;;
+        services)  FILE="${SERVER_ROOT}/logs/services.log" ;;
+        dashboard) FILE="${SERVER_ROOT}/logs/dashboard.log" ;;
+        maint)     FILE="${SERVER_ROOT}/logs/maintenance.log" ;;
+        *)         FILE="${SERVER_ROOT}/logs/${LOG_NAME}.log" ;;
+    esac
+    
+    if [ -f "$FILE" ]; then
+        log_hdr "LOG: ${FILE} (Last 30 lines)"
+        tail -n 30 "$FILE"
+    else
+        log_err "Log file not found: ${FILE}"
+    fi
+}
+
+cmd_doctor() {
+    log_hdr "PROJECT ZEUS ENVIRONMENT DOCTOR"
+    
+    [ "$(id -u)" -eq 0 ] && log_ok "Execution Context: Root (uid=0)" || log_err "Execution Context: Non-Root"
+    [ -d "$SERVER_ROOT" ] && log_ok "Server Root: ${SERVER_ROOT} exists" || log_err "Server Root Missing"
+    [ -f "/data/adb/service.d/99-zeus.sh" ] && log_ok "Magisk Hook: Registered (/data/adb/service.d/99-zeus.sh)" || log_warn "Magisk Hook Missing"
+    [ "$(getprop sys.boot_completed)" = "1" ] && log_ok "Android Framework: Boot Completed" || log_warn "Framework sys.boot_completed != 1"
+    [ -x "${SERVER_ROOT}/bin/tailscaled" ] && log_ok "Tailscale: Installed" || log_warn "Tailscale Not Installed (Optional: zeus tailscale setup)"
+    
+    command -v node >/dev/null 2>&1 && log_ok "Node.js: Available ($(node -v))" || log_warn "Node.js: Not in PATH"
+    command -v python3 >/dev/null 2>&1 && log_ok "Python 3: Available ($(python3 --version))" || log_warn "Python 3: Not in PATH"
+    command -v git >/dev/null 2>&1 && log_ok "Git: Available ($(git --version))" || log_warn "Git: Not in PATH"
+    [ -x "${SERVER_ROOT}/bin/nuclei" ] && log_ok "Nuclei: Available" || log_warn "Nuclei: Not Installed"
+    [ -f "${SERVER_ROOT}/apps/zap/zap.sh" ] && log_ok "OWASP ZAP: Available" || log_warn "OWASP ZAP: Not Installed"
+    
+    log_ok "Doctor audit complete."
+}
+
+cmd_restart() {
+    SVC_NAME="$1"
+    if [ -z "$SVC_NAME" ]; then
+        log_err "Please specify a service name to restart (e.g. zeus restart sshd)."
+        exit 1
+    fi
+    log_ok "Restarting service: ${SVC_NAME}..."
+    if [ -f "${SERVER_ROOT}/services/${SVC_NAME}.conf" ]; then
+        . "${SERVER_ROOT}/services/${SVC_NAME}.conf"
+        [ -n "$STOP" ] && eval "$STOP"
+        sleep 1
+        [ -n "$START" ] && eval "$START"
+        log_ok "Service ${SVC_NAME} restarted."
+    elif [ -x "${SERVER_ROOT}/startup/30-ssh.sh" ] && [ "$SVC_NAME" = "sshd" ]; then
+        pkill -f sshd 2>/dev/null || true
+        sh "${SERVER_ROOT}/startup/30-ssh.sh"
+        log_ok "SSH daemon restarted."
+    else
+        log_err "Unknown service definition: ${SVC_NAME}"
+    fi
+}
+
+cmd_scan() {
+    TARGET="$1"
+    MODE="${2:-nuclei}"
+    if [ -z "$TARGET" ]; then
+        log_err "Usage: zeus scan <TARGET_URL> [nuclei|zap-baseline|zap-active]"
+        exit 1
+    fi
+    if [ -x "${SERVER_ROOT}/bin/zeus-scan" ]; then
+        "${SERVER_ROOT}/bin/zeus-scan" "$TARGET" "$MODE"
+    else
+        log_err "Scanner runner not found. Run 'zeus scanner setup' first."
+        exit 1
+    fi
+}
+
+cmd_scanner() {
+    OP="${1:-status}"
+    case "$OP" in
+        setup)
+            sh "${SERVER_ROOT}/scripts/setup-scanner.sh"
+            ;;
+        status)
+            log_hdr "VULNERABILITY SCANNER SUITE STATUS"
+            [ -x "${SERVER_ROOT}/bin/nuclei" ] && log_ok "Nuclei:     Installed ($("${SERVER_ROOT}/bin/nuclei" -version 2>/dev/null | head -n 1))" || log_err "Nuclei:     Not Installed"
+            [ -f "${SERVER_ROOT}/apps/zap/zap.sh" ] && log_ok "OWASP ZAP:  Ready in ${SERVER_ROOT}/apps/zap" || log_err "OWASP ZAP:  Not Installed"
+            if pgrep -f "zap.sh" >/dev/null 2>&1 || pgrep -f "zap-.*.jar" >/dev/null 2>&1; then
+                log_ok "ZAP Daemon: Running (Port 8090)"
+            else
+                log_warn "ZAP Daemon: Idle"
+            fi
+            REPORT_COUNT=$(ls -1 "${SERVER_ROOT}/reports" 2>/dev/null | wc -l || echo "0")
+            log_ok "Reports:    ${REPORT_COUNT} stored in ${SERVER_ROOT}/reports"
+            ;;
+        reports)
+            log_hdr "RECENT VULNERABILITY REPORTS"
+            ls -lh "${SERVER_ROOT}/reports" 2>/dev/null || echo "No reports found."
+            ;;
+        *)
+            echo "Usage: zeus scanner [setup|status|reports]"
+            ;;
+    esac
+}
+
+cmd_update() {
+    log_hdr "PROJECT ZEUS UPDATE"
+    REPO_PATH="${1}"
+    if [ -z "$REPO_PATH" ]; then
+        for candidate in "." "/data/local/server/repo" "/data/data/com.termux/files/home/project-zeus" "/sdcard/project-zeus"; do
+            if [ -f "${candidate}/scripts/deploy.sh" ] && [ -d "${candidate}/bin" ]; then
+                REPO_PATH="$candidate"
+                break
+            fi
+        done
+    fi
+
+    if [ -n "$REPO_PATH" ] && [ -f "${REPO_PATH}/scripts/deploy.sh" ]; then
+        log_ok "Deploying updates from local repository at: ${REPO_PATH}..."
+        sh "${REPO_PATH}/scripts/deploy.sh" --local
+        log_ok "Update deployed successfully from ${REPO_PATH}."
+    else
+        log_warn "No Project Zeus repository found in current directory or standard paths."
+        echo "Usage: zeus update [path-to-cloned-repo]"
+        echo "Example: zeus update /data/data/com.termux/files/home/project-zeus"
+    fi
+}
+
+case "$1" in
+    status)    cmd_status ;;
+    metrics)   cmd_metrics ;;
+    logs)      cmd_logs "$2" ;;
+    doctor)    cmd_doctor ;;
+    restart)   cmd_restart "$2" ;;
+    tailscale) cmd_tailscale "$2" "$3" "$4" "$5" ;;
+    runtimes)  sh "${SERVER_ROOT}/scripts/setup-runtimes.sh" ;;
+    scan)      cmd_scan "$2" "$3" ;;
+    scanner)   cmd_scanner "$2" ;;
+    backup)    sh "${SERVER_ROOT}/scripts/backup.sh" ;;
+    update)    cmd_update "$2" ;;
+    reboot)    log_warn "Rebooting device..." && reboot ;;
+    *)         show_help ;;
+esac

@@ -1,0 +1,26 @@
+﻿# ==============================================================================
+# Project Zeus - Git Attributes & Line Ending Normalization
+# ==============================================================================
+
+# Set default behavior to normalize line endings to LF
+* text=auto eol=lf
+
+# Explicitly enforce LF for Android / POSIX shell scripts and binaries
+*.sh text eol=lf
+*.conf text eol=lf
+bin/zeus text eol=lf
+bin/photo_ftp_server.py text eol=lf
+
+# Windows desktop client utilities
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Web & Configurations
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.template text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROJECT ZEUS // TACTICAL MATRIX HUD</title>
+    <!-- Retro Monospace Phosphor Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="crt-screen">
+    <!-- CRT Overlay Filters -->
+    <div class="crt-scanlines" aria-hidden="true"></div>
+    <div class="crt-vignette" aria-hidden="true"></div>
+
+    <!-- Outer Corner Frame Accents -->
+    <div class="hud-corner-bracket outer top-left"></div>
+    <div class="hud-corner-bracket outer top-right"></div>
+    <div class="hud-corner-bracket outer bottom-left"></div>
+    <div class="hud-corner-bracket outer bottom-right"></div>
+
+    <div class="terminal-wrapper">
+
+        <!-- ============================================================== -->
+        <!-- 1. HEADER BAR                                                  -->
+        <!-- ============================================================== -->
+        <header class="hud-header">
+            <div class="window-controls">
+                <span class="ctrl-btn close">[x]</span>
+                <span class="ctrl-btn min">[-]</span>
+                <span class="ctrl-btn max">[+]</span>
+                <span class="hud-title font-pixel">ZEUS-OS // TACTICAL SERVER SUPERVISOR v0.2.0</span>
+            </div>
+
+            <div class="hud-nav-meta">
+                <span>HOST: <strong id="host-header-val">REALME X3 (ARM64)</strong></span>
+                <span class="dot">●</span>
+                <span>LAT: 19.0760° N</span>
+                <span class="dot">●</span>
+                <span>LONG: 72.8777° E</span>
+            </div>
+
+            <div class="hud-status">
+                <button class="ip-action-btn" onclick="copyIpAddress()" title="Click to copy IP address">
+                    <span class="blink">●</span> IP: <strong id="header-ip-val">192.168.1.5</strong>
+                    <span class="copy-tooltip" id="copy-feedback">[COPIED]</span>
+                </button>
+                <span class="signal-indicator"><span class="blink">●</span> MESH: ONLINE</span>
+                <span id="current-time" class="timestamp font-pixel">00:00:00 UTC</span>
+            </div>
+        </header>
+
+        <!-- ============================================================== -->
+        <!-- 2. STREAMLINED REALTIME TELEMETRY RIBBON (AT-A-GLANCE HUD)     -->
+        <!-- ============================================================== -->
+        <section class="telemetry-ribbon">
+            <div class="dither-line"></div>
+
+            <div class="ribbon-content">
+                <!-- Left KPI Chips -->
+                <div class="ribbon-kpis">
+                    <div class="hud-chip">
+                        <span class="chip-lbl">&gt; STATUS:</span>
+                        <span id="sys-status-val" class="chip-val text-glow-green">ONLINE [OPTIMAL]</span>
+                    </div>
+                    <div class="hud-chip">
+                        <span class="chip-lbl">&gt; UPTIME:</span>
+                        <span id="sys-uptime-val" class="chip-val">0d 0h 0m</span>
+                    </div>
+                    <div class="hud-chip">
+                        <span class="chip-lbl">&gt; BOOTS:</span>
+                        <span id="sys-boots-val" class="chip-val">#1</span>
+                    </div>
+                    <div class="hud-chip">
+                        <span class="chip-lbl">&gt; LOAD AVG:</span>
+                        <span id="sys-load-val" class="chip-val">0.00 0.00 0.00</span>
+                    </div>
+                    <div class="hud-chip">
+                        <span class="chip-lbl">&gt; SERVICES:</span>
+                        <span id="sys-services-summary" class="chip-val text-glow-green">7/7 RUNNING</span>
+                    </div>
+                </div>
+
+                <!-- Right Realtime Oscilloscope Sparkline -->
+                <div class="ribbon-oscilloscope">
+                    <div class="osc-header font-pixel">
+                        <span class="osc-title">&gt;&gt; REALTIME LOAD &amp; THERMAL OSCILLOSCOPE [60s STREAM]</span>
+                        <span id="graph-live-val" class="osc-val">LOAD: 0.00 | CPU: 39°C</span>
+                    </div>
+                    <div class="osc-canvas-wrap">
+                        <canvas id="realtime-graph" width="550" height="42"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- 3. MAIN TRIPLE-COLUMN WORKSPACE                                -->
+        <!-- ============================================================== -->
+        <main class="hud-grid">
+
+            <!-- PANEL 1: HARDWARE & TELEMETRY MATRIX -->
+            <section class="hud-panel telemetry-panel">
+                <div class="panel-header">
+                    <span class="panel-icon">+</span>
+                    <h2>HARDWARE TELEMETRY MATRIX</h2>
+                    <span class="panel-tag">// TELEMETRY_V2</span>
+                </div>
+
+                <div class="panel-body">
+                    <!-- CPU Thermal -->
+                    <div class="metric-row">
+                        <div class="metric-info">
+                            <span class="metric-label">&gt; CPU TEMP (THERMAL_0)</span>
+                            <span id="cpu-temp-val" class="metric-val text-glow-green">39°C</span>
+                        </div>
+                        <div class="ascii-bar-wrap">
+                            <div id="cpu-bar" class="ascii-bar">[████░░░░░░] 43%</div>
+                        </div>
+                    </div>
+
+                    <!-- RAM Usage -->
+                    <div class="metric-row">
+                        <div class="metric-info">
+                            <span class="metric-label">&gt; MEMORY (RAM LPDDR4X)</span>
+                            <span id="ram-val" class="metric-val">3544MB / 7529MB</span>
+                        </div>
+                        <div class="ascii-bar-wrap">
+                            <div id="ram-bar" class="ascii-bar">[█████░░░░░] 47%</div>
+                        </div>
+                    </div>
+
+                    <!-- Storage Usage -->
+                    <div class="metric-row">
+                        <div class="metric-info">
+                            <span class="metric-label">&gt; STORAGE UFS 3.0 (/data)</span>
+                            <span id="disk-val" class="metric-val">22G / 104G (22% used)</span>
+                        </div>
+                        <div class="ascii-bar-wrap">
+                            <div id="disk-bar" class="ascii-bar">[██░░░░░░░░] 22%</div>
+                        </div>
+                    </div>
+
+                    <!-- Battery Level & Temp -->
+                    <div class="metric-row">
+                        <div class="metric-info">
+                            <span class="metric-label">&gt; BATTERY &amp; POWER</span>
+                            <span id="batt-val" class="metric-val">100% (Full | 29°C)</span>
+                        </div>
+                        <div class="ascii-bar-wrap">
+                            <div id="batt-bar" class="ascii-bar">[██████████] 100%</div>
+                        </div>
+                    </div>
+
+                    <!-- CPU Detailed Metrics -->
+                    <div class="metric-details-grid">
+                        <div class="stat-box">
+                            <span class="lbl">&gt; CPU FREQ:</span>
+                            <span id="cpu-freq-val" class="val">1786 MHz</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="lbl">&gt; GOVERNOR:</span>
+                            <span id="cpu-gov-val" class="val">schedutil</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="lbl">&gt; ARCH / SOC:</span>
+                            <span class="val">KRYO 855+ (8-CORE)</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="lbl">&gt; MEM AVAIL:</span>
+                            <span id="ram-avail-val" class="val">3625 MB</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PANEL 2: ACTIVE SERVICES REGISTRY -->
+            <section class="hud-panel services-panel">
+                <div class="panel-header">
+                    <span class="panel-icon">+</span>
+                    <h2>ACTIVE SERVICES REGISTRY</h2>
+                    <span class="panel-tag">// SUPERVISOR_ACTIVE</span>
+                </div>
+
+                <div class="panel-body">
+                    <div id="services-container" class="services-list">
+                        <!-- Populated via JS -->
+                        <div class="svc-loading">&gt; INITIALIZING SERVICE REGISTRY...</div>
+                    </div>
+
+                    <div class="supervisor-status-box">
+                        <span class="lbl">&gt; CIRCUIT BREAKER:</span>
+                        <span class="val text-glow-green">ARMED [MAX 3 FAILS / 60s]</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PANEL 3: TOP SYSTEM PROCESSES (CLEAN BRUTALIST TABULAR LIST) -->
+            <section class="hud-panel processes-panel">
+                <div class="panel-header">
+                    <span class="panel-icon">+</span>
+                    <h2>TOP SYSTEM PROCESSES</h2>
+                    <div class="proc-header-controls">
+                        <input type="text" id="proc-filter-input" class="cmd-input proc-search" placeholder="filter proc..." oninput="filterProcesses(this.value)" autocomplete="off" />
+                        <button class="mode-toggle-btn" id="btn-proc-toggle" onclick="toggleProcessView()" title="Toggle between Table and Radar view">[RADAR]</button>
+                    </div>
+                </div>
+
+                <div class="panel-body processes-panel-body">
+                    <!-- Tabular Process List -->
+                    <div id="proc-table-wrap" class="process-table-wrap">
+                        <table class="process-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 55px;">PID</th>
+                                    <th style="width: 65px;">USER</th>
+                                    <th style="width: 55px; text-align: right;">CPU%</th>
+                                    <th style="width: 55px; text-align: right;">MEM%</th>
+                                    <th>COMMAND</th>
+                                </tr>
+                            </thead>
+                            <tbody id="process-table-body">
+                                <tr><td colspan="5" style="text-align: center; color: var(--phosphor-dim);">&gt; POLLING ACTIVE PROCESSES...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Radar View (Toggleable) -->
+                    <div id="proc-radar-wrap" class="proc-radar-wrap" style="display: none;">
+                        <div class="canvas-pie-wrap">
+                            <canvas id="processes-pie-canvas" width="260" height="170"></canvas>
+                        </div>
+                        <div id="process-hover-details" class="process-details-box">
+                            <span class="lbl" style="color: var(--phosphor-dim);">&gt; HOVER RADAR SLICE FOR ANALYSIS</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- ============================================================== -->
+        <!-- 4. BOTTOM DUAL-COLUMN GRID: TERMINAL & LOG VIEWER             -->
+        <!-- ============================================================== -->
+        <section class="hud-grid bottom-grid">
+
+            <!-- INTERACTIVE CYBER TERMINAL -->
+            <section class="hud-panel terminal-panel">
+                <div class="panel-header">
+                    <span class="panel-icon">+</span>
+                    <h2>INTERACTIVE CYBER TERMINAL</h2>
+                    <span class="panel-tag">// BIN_ZEUS</span>
+                </div>
+
+                <div class="panel-body">
+                    <div class="terminal-quick-actions">
+                        <span class="label">QUICK:</span>
+                        <button class="cmd-btn" onclick="runCliCmd('status')">zeus status</button>
+                        <button class="cmd-btn" onclick="runCliCmd('doctor')">zeus doctor</button>
+                        <button class="cmd-btn" onclick="runCliCmd('metrics')">zeus metrics</button>
+                        <button class="cmd-btn" onclick="runCliCmd('backup')">zeus backup</button>
+                        <button class="cmd-btn" onclick="runCliCmd('runtimes')">zeus runtimes</button>
+                        <button class="cmd-btn" onclick="clearTerminal()" style="margin-left: auto;">[CLR]</button>
+                    </div>
+
+                    <div id="terminal-output" class="terminal-display">
+                        <div class="log-line">&gt; ZEUS CYBER TERMINAL INITIALIZED.</div>
+                        <div class="log-line">&gt; CONNECTED TO QUALCOMM SNAPDRAGON 855+ ARM64 DAEMON.</div>
+                    </div>
+
+                    <form id="terminal-form" class="terminal-input-row" onsubmit="handleCliSubmit(event)">
+                        <span class="prompt">zeus@realmex3:~#</span>
+                        <input type="text" id="cli-input" class="cmd-input" placeholder="zeus doctor" autocomplete="off" spellcheck="false">
+                        <button type="submit" class="submit-btn">[EXEC]</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- LIVE SYSTEM LOG STREAMER (EXPANDED TABS) -->
+            <section class="hud-panel logs-panel">
+                <div class="panel-header">
+                    <span class="panel-icon">+</span>
+                    <h2>SYSTEM LOG STREAMER</h2>
+                    <div class="log-tabs">
+                        <button class="tab-btn active" onclick="switchLogTab('boot', this)">BOOT</button>
+                        <button class="tab-btn" onclick="switchLogTab('watchdog', this)">SUPERVISOR</button>
+                        <button class="tab-btn" onclick="switchLogTab('metrics', this)">METRICS</button>
+                        <button class="tab-btn" onclick="switchLogTab('services', this)">SERVICES</button>
+                        <button class="tab-btn" onclick="switchLogTab('system', this)">KERNEL</button>
+                        <button class="tab-btn" onclick="switchLogTab('main', this)">MAIN</button>
+                        <button class="tab-btn" onclick="switchLogTab('zap', this)">ZAP</button>
+                        <button class="tab-btn" onclick="switchLogTab('maint', this)">MAINT</button>
+                        <button class="tab-btn" onclick="switchLogTab('dashboard', this)">DASH</button>
+                    </div>
+                </div>
+
+                <div class="panel-body">
+                    <div class="log-toolbar">
+                        <span class="lbl">&gt; FILTER:</span>
+                        <input type="text" id="log-search-input" class="cmd-input log-search-field" placeholder="grep stream..." oninput="filterLogStream(this.value)" autocomplete="off" />
+                        <button class="cmd-btn" id="btn-autoscroll" onclick="toggleAutoScroll()" style="padding: 2px 6px;">SCROLL: ON</button>
+                        <button class="cmd-btn" onclick="fetchLogStream(currentLogTab)" style="padding: 2px 6px;">[REFRESH]</button>
+                    </div>
+                    <pre id="log-display" class="log-content">&gt; LOADING LOG STREAM...</pre>
+                </div>
+            </section>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- 5. DOCKED VULNERABILITY SCANNER (EXPANDABLE BRUTALIST DRAWER) -->
+        <!-- ============================================================== -->
+        <section class="hud-panel scanner-panel" id="scanner">
+            <div class="panel-header scanner-header-bar" onclick="toggleScannerDrawer()">
+                <span class="panel-icon">+</span>
+                <h2>VULNERABILITY SCANNER &amp; DAST SUITE</h2>
+                <div class="scanner-header-right">
+                    <span id="scanner-status-tag" class="panel-tag">// SCANNER_IDLE</span>
+                    <button class="drawer-btn font-pixel" id="scanner-drawer-btn">[+] EXPAND</button>
+                </div>
+            </div>
+
+            <div class="panel-body scanner-drawer-body" id="scanner-drawer-content" style="display: none;">
+                <div class="scanner-controls-grid">
+                    <div class="scanner-input-group">
+                        <label class="lbl" for="scanner-target-input">&gt; TARGET URL / WEB APPLICATION:</label>
+                        <div class="scanner-url-row">
+                            <input type="url" id="scanner-target-input" class="cmd-input" placeholder="https://my-site.com" autocomplete="off" spellcheck="false" />
+                            <select id="scanner-type-select" class="cmd-select">
+                                <option value="nuclei">⚡ Nuclei Fast CVE &amp; Config Audit</option>
+                                <option value="zap-baseline">🕷️ OWASP ZAP Baseline (Spider + Passive DAST)</option>
+                                <option value="zap-active">🎯 OWASP ZAP Active Attack (Deep Flaw Fuzzing)</option>
+                            </select>
+                            <button id="btn-start-scan" class="action-btn" onclick="startScannerJob()">[▶ LAUNCH SCAN]</button>
+                            <button id="btn-stop-scan" class="action-btn btn-danger" onclick="stopScannerJob()" style="display: none;">[■ ABORT]</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scanner Dual Column -->
+                <div class="scanner-dual-grid">
+                    <div class="scanner-console-col">
+                        <div class="sub-header">
+                            <span>&gt; SCAN PROGRESS &amp; ENGINE STDOUT:</span>
+                            <span id="scan-target-display" style="color: var(--phosphor-glow); font-weight: bold;">TARGET: NONE</span>
+                        </div>
+                        <pre id="scanner-live-output" class="scanner-terminal">&gt; Scanner engine ready. Enter target URL above to launch vulnerability assessment.</pre>
+                    </div>
+
+                    <div class="scanner-reports-col">
+                        <div class="sub-header">
+                            <span>&gt; RECENT VULNERABILITY REPORTS:</span>
+                            <button class="cmd-btn" style="padding: 2px 6px; font-size: 0.75rem;" onclick="fetchScannerReports()">[REFRESH]</button>
+                        </div>
+                        <div id="scanner-reports-list" class="reports-list-wrap">
+                            <div class="report-empty">&gt; Polling vulnerability reports...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- 6. TACTICAL FOOTER STRIP                                       -->
+        <!-- ============================================================== -->
+        <footer class="hud-footer">
+            <div class="footer-left">
+                <span>&gt; SYS_OK</span> |
+                <span>NODE: <strong id="footer-host-str">REALMEX3-ARM64</strong></span> |
+                <span>KERNEL: ZEUS-X3 [4.14.206]</span>
+            </div>
+            <div class="footer-right">
+                <span>MAGISK v30.7</span> |
+                <span>BUSYBOX ACTIVE</span> |
+                <span class="blink">&gt;&gt; RIDE INTO DARK_</span>
+            </div>
+        </footer>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
