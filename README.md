@@ -150,6 +150,31 @@ Commands:
 
 ---
 
+## 💡 The Cold-Start Breakthrough: Controlling a Broken-Screen Phone
+
+The biggest hurdle with repurposing a broken-screen device is the **ADB authorization prompt**:
+```text
+$ adb devices
+4b1bfc87    unauthorized
+```
+Normally, Android requires you to tap **"Allow USB Debugging"** on the screen. If the display is shattered or touch is unresponsive, you are locked out.
+
+### The Key Injection Hack
+Instead of giving up on the hardware, you can pre-authorize your computer from custom recovery:
+1. Boot into **TWRP / Recovery** via Fastboot (`fastboot flash recovery twrp.img` && `fastboot reboot recovery`). Recovery ADB runs unauthenticated.
+2. Mount the `/data` partition (`adb shell mount /data`).
+3. Push your workstation's public ADB key directly into Android's trusted key store:
+   ```bash
+   adb push "%USERPROFILE%\.android\adbkey.pub" /data/misc/adb/adb_keys
+   adb shell chown system:shell /data/misc/adb/adb_keys
+   adb shell chmod 640 /data/misc/adb/adb_keys
+   ```
+4. Reboot into Android (`adb reboot`). Android reads `/data/misc/adb/adb_keys`, recognizes your PC as a pre-authorized host, and exposes a fully authorized shell without touching the screen.
+
+> 📖 *For the full 16-stage journey—including kernel boot patching, ROM stability trade-offs, and Doze whitelisting—see [docs/COLD_START_RECOVERY.md](docs/COLD_START_RECOVERY.md).*
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -319,6 +344,7 @@ To keep Android system folders clean, all server components reside under `/data/
 - 📝 **[DECISIONS.md](docs/DECISIONS.md)** — Architectural Decision Records (ADRs 001–006) explaining engineering trade-offs.
 - 🐛 **[KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)** — Hardware quirks, Doze mode mitigations, and solutions.
 - 🗺️ **[ROADMAP.md](docs/ROADMAP.md)** — Future enhancements (Docker/chroot containers, AI agent hosting, reverse proxies).
+- 💡 **[COLD_START_RECOVERY.md](docs/COLD_START_RECOVERY.md)** — Cold-start breakthrough: bypassing broken-screen ADB authorization, key injection, and Magisk boot patching.
 - 🤝 **[CONTRIBUTING.md](docs/CONTRIBUTING.md)** — POSIX shell style conventions and Pull Request guidelines.
 - 🏷️ **[CHANGELOG.md](docs/CHANGELOG.md)** — Version release notes.
 
