@@ -130,7 +130,7 @@ cmd_metrics() {
         if [ -f "$tz/type" ] && [ -f "$tz/temp" ]; then
             type_val=$(cat "$tz/type" 2>/dev/null)
             case "$type_val" in
-                cpu-*-usr|cpu-0-*-usr|cpu-1-*-usr)
+                cpu-*-usr)
                     temp_val=$(cat "$tz/temp" 2>/dev/null || echo 0)
                     if [ "$temp_val" -gt "$max_temp" ] 2>/dev/null; then
                         max_temp=$temp_val
@@ -212,6 +212,7 @@ cmd_restart() {
     fi
     log_ok "Restarting service: ${SVC_NAME}..."
     if [ -f "${SERVER_ROOT}/services/${SVC_NAME}.conf" ]; then
+        # shellcheck disable=SC1090
         . "${SERVER_ROOT}/services/${SVC_NAME}.conf"
         [ -n "$STOP" ] && eval "$STOP"
         sleep 1

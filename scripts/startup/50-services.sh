@@ -28,6 +28,7 @@ if [ -d "$SERVICES_DIR" ]; then
             NAME=""
             START=""
             ENABLED="1"
+            # shellcheck disable=SC1090
             . "$conf_file"
             if [ "$ENABLED" = "1" ] && [ -n "$START" ]; then
                 log_info "Launching service unit [${NAME}]: ${START}..."

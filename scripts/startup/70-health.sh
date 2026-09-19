@@ -22,7 +22,7 @@ for tz in /sys/class/thermal/thermal_zone*; do
     if [ -f "$tz/type" ] && [ -f "$tz/temp" ]; then
         type_val=$(cat "$tz/type" 2>/dev/null)
         case "$type_val" in
-            cpu-*-usr|cpu-0-*-usr|cpu-1-*-usr)
+            cpu-*-usr)
                 temp_val=$(cat "$tz/temp" 2>/dev/null || echo 0)
                 if [ "$temp_val" -gt "$max_temp" ] 2>/dev/null; then
                     max_temp=$temp_val

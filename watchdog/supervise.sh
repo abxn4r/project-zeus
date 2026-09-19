@@ -39,6 +39,7 @@ process_service_registry() {
             NAME=""
             PROCESS=""
             START=""
+            # shellcheck disable=SC2034
             STOP=""
             ENABLED="1"
             MAX_FAILURES=3
